@@ -1,3 +1,5 @@
+![spintransport-suite](spintransport_logo.png)
+
 # spintransport-suite
 
 Toolkit to simulate and visualize **hole spin transport properties** in quasi-1D wires (Datta–Das SFET based), including time evolution, T(E)/R(E), spin precession, and device-level metrics + reports.
