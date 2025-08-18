@@ -1,6 +1,23 @@
-<<<<<<< HEAD
-# spin-transport
-=======
+Metadata-Version: 2.4
+Name: spintransport
+Version: 0.1.1
+Summary: Hole spin transport toolkit for Kohn–Luttinger Hamiltonian (Datta–Das style).
+Author: Jorge Luis Beltran Diaz and Leovildo Diago Cisneros
+Project-URL: Homepage, https://github.com/tuusuario/spintransport-suite
+Project-URL: Issues, https://github.com/tuusuario/spintransport-suite/issues
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.24
+Requires-Dist: scipy>=1.10
+Requires-Dist: matplotlib>=3.7
+Requires-Dist: imageio>=2.34.0
+Requires-Dist: tqdm
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: build; extra == "dev"
+Requires-Dist: twine; extra == "dev"
+
 # spintransport-suite
 
 Toolkit to simulate and visualize **hole spin transport properties** in quasi-1D wires (Datta–Das SFET based), including time evolution, T(E)/R(E), spin precession, and device-level metrics + reports.
@@ -403,4 +420,3 @@ spintransport-export-summary --dir rashba_out --Ef 0.12 --T 77
 # 2e^2/h y salida personalizada:
 spintransport-export-summary --dir rashba_out --spin-deg --out rashba_out/summary_v1.md
 ```
->>>>>>> b8fb86f (Initial commit (spintransport-suite 0.1.x))

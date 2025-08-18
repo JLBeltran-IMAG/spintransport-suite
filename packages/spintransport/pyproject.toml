@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spintransport"
+version = "0.1.1"
+description = "Hole spin transport toolkit for Kohn–Luttinger Hamiltonian (Datta–Das style)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Jorge Luis Beltran Diaz and Leovildo Diago Cisneros" }]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "matplotlib>=3.7",
+  "imageio>=2.34.0",
+  "tqdm"
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "build", "twine"]
+
+[project.urls]
+Homepage = "https://github.com/tuusuario/spintransport-suite"
+Issues   = "https://github.com/tuusuario/spintransport-suite/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# [tool.setuptools.package-data]
+# spintransport = ["**/*.json", "**/*.txt"]
+
+[project.scripts]
+spintransport-sim              = "spintransport.cli.sim:main"
+spintransport-time-evolution   = "spintransport.viz.time_evolution:main"
+spintransport-export-mp4       = "spintransport.viz.export_mp4:main"
+spintransport-export-gif       = "spintransport.viz.export_gif:main"
+spintransport-plot-tr          = "spintransport.viz.plot_tr:main"
+spintransport-plot-precession  = "spintransport.viz.plot_precession:main"
+spintransport-export-report    = "spintransport.reports.export_report:main"
+spintransport-export-summary   = "spintransport.reports.export_summary:main"
