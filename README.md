@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# spin-transport
-=======
 # spintransport-suite
 
 Toolkit to simulate and visualize **hole spin transport properties** in quasi-1D wires (Datta–Das SFET based), including time evolution, T(E)/R(E), spin precession, and device-level metrics + reports.
@@ -403,4 +400,3 @@ spintransport-export-summary --dir rashba_out --Ef 0.12 --T 77
 # 2e^2/h y salida personalizada:
 spintransport-export-summary --dir rashba_out --spin-deg --out rashba_out/summary_v1.md
 ```
->>>>>>> b8fb86f (Initial commit (spintransport-suite 0.1.x))
