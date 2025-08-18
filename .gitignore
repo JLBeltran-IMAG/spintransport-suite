@@ -1,3 +1,13 @@
+# Build artifacts (global por si aparecen en otros subproyectos)
+build/
+dist/
+*.egg-info/
+
+# Específicos del paquete
+packages/spintransport/build/
+packages/spintransport/dist/
+packages/spintransport/*.egg-info/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
