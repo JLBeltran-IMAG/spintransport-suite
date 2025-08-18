@@ -1,9 +1,0 @@
-[console_scripts]
-spintransport-export-gif = spintransport.viz.export_gif:main
-spintransport-export-mp4 = spintransport.viz.export_mp4:main
-spintransport-export-report = spintransport.reports.export_report:main
-spintransport-export-summary = spintransport.reports.export_summary:main
-spintransport-plot-precession = spintransport.viz.plot_precession:main
-spintransport-plot-tr = spintransport.viz.plot_tr:main
-spintransport-sim = spintransport.cli.sim:main
-spintransport-time-evolution = spintransport.viz.time_evolution:main
