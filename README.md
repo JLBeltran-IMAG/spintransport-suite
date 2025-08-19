@@ -1,4 +1,4 @@
-![spintransport-suite](spintransport_logo.png)
+![spintransport-suite](img/spintransport_logo.png)
 
 # SPINTRANSPORT-SUITE
 
