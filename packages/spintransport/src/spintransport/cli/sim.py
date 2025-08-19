@@ -324,7 +324,7 @@ class SimConfig:
     Vb_eV: float
     beta_eff_eVA: float
     outdir: Path
-    kz_expect: float = 0.0
+    kz_expect: float
 
 
 def parse_args() -> SimConfig:
