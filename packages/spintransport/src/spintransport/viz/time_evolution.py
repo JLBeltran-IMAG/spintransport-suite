@@ -27,6 +27,8 @@ from typing import Tuple, Iterable, List
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
+from matplotlib.ticker import FuncFormatter
+
 
 from spintransport.io.simio import read_sim, SimData
 
@@ -36,7 +38,7 @@ def _build_barrier(ax, yL: int | None, yR: int | None, dy_A: float):
     if yL is None or yR is None:
         return None
     xL, xR = yL * dy_A, yR * dy_A
-    return ax.axvspan(xL, xR, alpha=0.15, color="green", lw=0, label="barrier")
+    return ax.axvspan(xL, xR, alpha=0.5, color="green", lw=0, label="barrier")
 
 
 def _compute_ylim_for_energy(psi_E: np.ndarray, layout: str) -> Tuple[float, float]:
@@ -62,17 +64,17 @@ def _prepare_lines(ax,
                    psi: np.ndarray,
                    ny: int,
                    t0: int,
-                   E: int,
+                   E0: int,
                    layout: str):
     """
     Create line objects for the initial time slice t0. Returns the list of lines and a closure updater.
     In 'split' layout, LH curves are plotted as the negative mirror of their positive magnitudes.
     """
     # initial data
-    hh_up = np.abs(psi[0 * ny:1 * ny, t0, E]) ** 2
-    hh_dn = np.abs(psi[3 * ny:4 * ny, t0, E]) ** 2
-    lh_up = np.abs(psi[1 * ny:2 * ny, t0, E]) ** 2
-    lh_dn = np.abs(psi[2 * ny:3 * ny, t0, E]) ** 2
+    hh_up = np.abs(psi[0 * ny:1 * ny, t0, E0]) ** 2
+    hh_dn = np.abs(psi[3 * ny:4 * ny, t0, E0]) ** 2
+    lh_up = np.abs(psi[1 * ny:2 * ny, t0, E0]) ** 2
+    lh_dn = np.abs(psi[2 * ny:3 * ny, t0, E0]) ** 2
 
     if layout == "split":
         # HH positive, LH negative (mirror)
@@ -80,26 +82,24 @@ def _prepare_lines(ax,
         y_hh_dn = hh_dn
         y_lh_up = -lh_up
         y_lh_dn = -lh_dn
-        lh_labels = ("LH↑ (neg)", "LH↓ (neg)")
     else:
         # Shared axis: all positive
         y_hh_up = hh_up
         y_hh_dn = hh_dn
         y_lh_up = lh_up
         y_lh_dn = lh_dn
-        lh_labels = ("LH↑", "LH↓")
 
     l1, = ax.plot(x_A, y_hh_up, lw=1.6, color="tab:red",   label="HH↑")
     l2, = ax.plot(x_A, y_hh_dn, lw=1.6, color="tab:blue",  label="HH↓", ls="--")
-    l3, = ax.plot(x_A, y_lh_up, lw=1.2, color="tab:green", label=lh_labels[0])
-    l4, = ax.plot(x_A, y_lh_dn, lw=1.2, color="tab:purple",label=lh_labels[1], ls="--")
+    l3, = ax.plot(x_A, y_lh_up, lw=1.2, color="tab:green", label="LH↑")
+    l4, = ax.plot(x_A, y_lh_dn, lw=1.2, color="tab:purple",label="LH↓", ls="--")
     lines = [l1, l2, l3, l4]
 
-    def _update(time_idx: int):
-        hh_up = np.abs(psi[0 * ny:1 * ny, time_idx, E]) ** 2
-        hh_dn = np.abs(psi[3 * ny:4 * ny, time_idx, E]) ** 2
-        lh_up = np.abs(psi[1 * ny:2 * ny, time_idx, E]) ** 2
-        lh_dn = np.abs(psi[2 * ny:3 * ny, time_idx, E]) ** 2
+    def _update(time_idx: int, E_idx: int):
+        hh_up = np.abs(psi[0 * ny:1 * ny, time_idx, E_idx]) ** 2
+        hh_dn = np.abs(psi[3 * ny:4 * ny, time_idx, E_idx]) ** 2
+        lh_up = np.abs(psi[1 * ny:2 * ny, time_idx, E_idx]) ** 2
+        lh_dn = np.abs(psi[2 * ny:3 * ny, time_idx, E_idx]) ** 2
 
         if layout == "split":
             y = (hh_up, hh_dn, -lh_up, -lh_dn)
@@ -128,6 +128,10 @@ def _save_snapshot(sim: SimData, E: int, t_idx: int, layout: str, style: str, ou
     psi_E = sim.psi[:, :, E]
     ylo, yhi = _compute_ylim_for_energy(psi_E, layout)
     ax.set_ylim(ylo, yhi)
+
+    # Show positive labels on Y in split layout
+    if layout == "split":
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda y, pos: f"{abs(y):.3g}"))
     ax.set_xlim(0.0, x_A[-1] if len(x_A) else 1.0)
 
     # --- Data at t_idx
@@ -137,12 +141,11 @@ def _save_snapshot(sim: SimData, E: int, t_idx: int, layout: str, style: str, ou
     lh_up = np.abs(sim.psi[1*ny:2*ny, t_idx, E])**2
     lh_dn = np.abs(sim.psi[2*ny:3*ny, t_idx, E])**2
 
+    labels = ("HH↑", "HH↓", "LH↑", "LH↓")
     if layout == "split":
         yvals  = (hh_up, hh_dn, -lh_up, -lh_dn)
-        labels = ("HH↑", "HH↓", "LH↑ (neg)", "LH↓ (neg)")
     else:
         yvals  = (hh_up, hh_dn,  lh_up,  lh_dn)
-        labels = ("HH↑", "HH↓", "LH↑", "LH↓")
 
     ax.plot(x_A, yvals[0], lw=1.6, color="tab:red",    label=labels[0])
     ax.plot(x_A, yvals[1], lw=1.6, color="tab:blue",   label=labels[1], ls="--")
@@ -154,19 +157,19 @@ def _save_snapshot(sim: SimData, E: int, t_idx: int, layout: str, style: str, ou
     ax.grid(True)
     ax.legend(loc="best")
 
-    # ---- Gather meta (robusto a ausencias)
+    # ---- Gather meta
     energies_eV = getattr(sim, "energies_eV", None)
     dt_fs       = getattr(sim, "dt_fs", None)
     dy_A        = float(getattr(sim, "dy_A", 1.0))
     nt          = int(getattr(sim, "nt", sim.psi.shape[1]))
     yL, yR      = getattr(sim, "yL", None), getattr(sim, "yR", None)
 
-    # E (solo valor en eV, con LaTeX)
+    # E
     line1_parts = []
     if energies_eV is not None and 0 <= E < len(energies_eV):
         line1_parts.append(rf"$E \approx {float(energies_eV[E]):.3f}\ \mathrm{{eV}}$")
 
-    # tiempo (fs o índice)
+    # time (fs o index)
     if dt_fs is not None:
         line1_parts.append(rf"$t = {t_idx*float(dt_fs):.2f}\ \mathrm{{fs}}$")
     else:
@@ -177,7 +180,7 @@ def _save_snapshot(sim: SimData, E: int, t_idx: int, layout: str, style: str, ou
     L_total_A = sim.ny * dy_A if hasattr(sim, "ny") else None
     T_total_fs = float(dt_fs)*(nt-1) if dt_fs is not None else None
 
-    # Lb desde meta o de yR-yL
+    # Lb from meta or from yR-yL
     Lb_A = None
     if hasattr(sim, "meta") and isinstance(sim.meta, dict):
         for k in ("Lb_A", "Lb_Å", "Lb_angstrom"):
@@ -193,7 +196,7 @@ def _save_snapshot(sim: SimData, E: int, t_idx: int, layout: str, style: str, ou
     if T_total_fs is not None: line2_parts.append(rf"$T = {T_total_fs:.1f}\ \mathrm{{fs}}$")
     line2 = " \u2014 ".join(line2_parts)
 
-    # gamma_1,2,3 y beta_eff
+    # gamma_1,2,3 and beta_eff
     def _get_meta(key):
         if hasattr(sim, key): return getattr(sim, key)
         if hasattr(sim, "meta") and isinstance(sim.meta, dict): return sim.meta.get(key, None)
@@ -269,9 +272,10 @@ def main():
     plt.style.use(args.style)
 
     # Figure layout: main axis + slider axis
-    fig = plt.figure(figsize=(10.5, 5.5))
-    ax = fig.add_axes((0.08, 0.18, 0.88, 0.75))   # left, bottom, width, height
-    ax_slider = fig.add_axes((0.08, 0.08, 0.88, 0.05))
+    fig = plt.figure(figsize=(10.5, 5.8))
+    ax        = fig.add_axes((0.08, 0.24, 0.88, 0.70))  # main plot
+    ax_time   = fig.add_axes((0.08, 0.13, 0.88, 0.05))  # time slider
+    ax_energy = fig.add_axes((0.08, 0.06, 0.88, 0.05))  # energy slider
 
     # Barrier overlay (if available in meta)
     _build_barrier(ax, sim.yL, sim.yR, sim.dy_A)
@@ -280,10 +284,14 @@ def main():
     psi_E = sim.psi[:, :, E]  # (4*ny, nt)
     ymin, ymax = _compute_ylim_for_energy(psi_E, layout=args.layout)
     ax.set_ylim(ymin, ymax)
+
+    if args.layout == "split":
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda y, pos: f"{abs(y):.3g}"))
+
     ax.set_xlim(0.0, x_A[-1] if len(x_A) else 1.0)
 
     # Lines and updater
-    lines, updater = _prepare_lines(ax, x_A, sim.psi, sim.ny, t0=0, E=E, layout=args.layout)
+    lines, updater = _prepare_lines(ax, x_A, sim.psi, sim.ny, t0=0, E0=E, layout=args.layout)
 
     # Labels & title
     ax.set_xlabel(r"$L\ (\AA)$", fontsize=12)
@@ -303,7 +311,7 @@ def main():
 
     # Slider (integer ticks over [0, nt-1])
     s_time = Slider(
-        ax=ax_slider,
+        ax=ax_time,
         label="time",
         valmin=0,
         valmax=sim.nt - 1,
@@ -311,16 +319,44 @@ def main():
         valstep=1,
     )
 
-    def _on_change(val):
+    s_energy = Slider(
+        ax=ax_energy,
+        label="Energy",
+        valmin=0,
+        valmax=sim.nE - 1,
+        valinit=E,
+        valstep=1,
+    )
+
+    def _update_all(_=None):
         t_idx = int(s_time.val)
-        updater(t_idx)
+        E_idx = int(s_energy.val)
+
+        # actualizar curvas
+        updater(t_idx, E_idx)
+
+        # actualizar límites Y según energía
+        ymin, ymax = _compute_ylim_for_energy(sim.psi[:, :, E_idx], layout=args.layout)
+        ax.set_ylim(ymin, ymax)
+        if args.layout == "split":
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda y, pos: f"{abs(y):.3g}"))
+
+        # actualizar título y etiqueta de tiempo
+        title_e = f"E index {E_idx}/{sim.nE-1}"
+        if sim.energies_eV is not None and 0 <= E_idx < len(sim.energies_eV):
+            title_e += f"  (E ≈ {float(sim.energies_eV[E_idx]):.3f} eV)"
+        ax.set_title(f"Time evolution — {title_e}")
+
         if sim.dt_fs is not None:
             time_txt.set_text(f"t = {t_idx * sim.dt_fs:.2f} fs")
         else:
             time_txt.set_text(f"t index = {t_idx}")
+
+        # etiqueta del slider de energía
         fig.canvas.draw_idle()
 
-    s_time.on_changed(_on_change)
+    s_time.on_changed(_update_all)
+    s_energy.on_changed(_update_all)
 
     # Keyboard shortcuts for convenience
     def _on_key(event):
@@ -330,6 +366,12 @@ def main():
             new = max(0, min(sim.nt - 1, cur + step))
             if new != cur:
                 s_time.set_val(new)
+        elif event.key in ("down", "up"):
+            cur = int(s_energy.val)
+            step = -1 if event.key == "down" else 1
+            new = max(0, min(sim.nE - 1, cur + step))
+            if new != cur:
+                s_energy.set_val(new)
 
     fig.canvas.mpl_connect("key_press_event", _on_key)
 
