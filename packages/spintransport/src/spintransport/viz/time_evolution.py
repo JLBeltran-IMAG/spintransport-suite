@@ -28,7 +28,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
-from spintransport.io.simio import read_sim
+from spintransport.io.simio import read_sim, SimData
 
 
 def _build_barrier(ax, yL: int | None, yR: int | None, dy_A: float):
@@ -113,60 +113,119 @@ def _prepare_lines(ax,
     return lines, _update
 
 
-def _save_snapshot(sim, E: int, t_idx: int, layout: str, style: str, outdir: Path, dpi: int) -> Path:
+def _save_snapshot(sim: SimData, E: int, t_idx: int, layout: str, style: str, outdir: Path, dpi: int) -> Path:
     """
-    Render and save a static PNG snapshot at time index t_idx for energy E.
+    Render and save a static PNG snapshot at time index t_idx for energy index E.
     """
     plt.style.use(style)
-    fig, ax = plt.subplots(figsize=(8.8, 4.8))
+    fig, ax = plt.subplots(figsize=(6, 4), layout="constrained")
 
-    # Axis and barrier
+    # --- Axis & barrier
     x_A = np.arange(sim.ny) * float(sim.dy_A)
     _build_barrier(ax, sim.yL, sim.yR, sim.dy_A)
 
-    # Limits
+    # --- Limits
     psi_E = sim.psi[:, :, E]
     ylo, yhi = _compute_ylim_for_energy(psi_E, layout)
     ax.set_ylim(ylo, yhi)
     ax.set_xlim(0.0, x_A[-1] if len(x_A) else 1.0)
 
-    # Plot lines for this t
+    # --- Data at t_idx
     ny = sim.ny
-    hh_up = np.abs(sim.psi[0 * ny:1 * ny, t_idx, E]) ** 2
-    hh_dn = np.abs(sim.psi[3 * ny:4 * ny, t_idx, E]) ** 2
-    lh_up = np.abs(sim.psi[1 * ny:2 * ny, t_idx, E]) ** 2
-    lh_dn = np.abs(sim.psi[2 * ny:3 * ny, t_idx, E]) ** 2
+    hh_up = np.abs(sim.psi[0*ny:1*ny, t_idx, E])**2
+    hh_dn = np.abs(sim.psi[3*ny:4*ny, t_idx, E])**2
+    lh_up = np.abs(sim.psi[1*ny:2*ny, t_idx, E])**2
+    lh_dn = np.abs(sim.psi[2*ny:3*ny, t_idx, E])**2
 
     if layout == "split":
-        y = (hh_up, hh_dn, -lh_up, -lh_dn)
+        yvals  = (hh_up, hh_dn, -lh_up, -lh_dn)
         labels = ("HH↑", "HH↓", "LH↑ (neg)", "LH↓ (neg)")
     else:
-        y = (hh_up, hh_dn, lh_up, lh_dn)
+        yvals  = (hh_up, hh_dn,  lh_up,  lh_dn)
         labels = ("HH↑", "HH↓", "LH↑", "LH↓")
 
-    ax.plot(x_A, y[0], lw=1.6, color="tab:red",   label=labels[0])
-    ax.plot(x_A, y[1], lw=1.6, color="tab:blue",  label=labels[1], ls="--")
-    ax.plot(x_A, y[2], lw=1.2, color="tab:green", label=labels[2])
-    ax.plot(x_A, y[3], lw=1.2, color="tab:purple",label=labels[3], ls="--")
+    ax.plot(x_A, yvals[0], lw=1.6, color="tab:red",    label=labels[0])
+    ax.plot(x_A, yvals[1], lw=1.6, color="tab:blue",   label=labels[1], ls="--")
+    ax.plot(x_A, yvals[2], lw=1.2, color="tab:green",  label=labels[2])
+    ax.plot(x_A, yvals[3], lw=1.2, color="tab:purple", label=labels[3], ls="--")
 
-    # Labels & title
     ax.set_xlabel(r"$L\ (\AA)$", fontsize=12)
     ax.set_ylabel(r"$|\psi|^2$", fontsize=12)
-    title_e = f"E index {E}/{sim.nE-1}"
-    if sim.energies_eV is not None and 0 <= E < len(sim.energies_eV):
-        title_e += f"  (E ≈ {float(sim.energies_eV[E]):.3f} eV)"
-    if sim.dt_fs is not None:
-        ax.set_title(f"Snapshot — {title_e} — t = {t_idx * sim.dt_fs:.2f} fs")
-    else:
-        ax.set_title(f"Snapshot — {title_e} — t index = {t_idx}")
     ax.grid(True)
     ax.legend(loc="best")
 
+    # ---- Gather meta (robusto a ausencias)
+    energies_eV = getattr(sim, "energies_eV", None)
+    dt_fs       = getattr(sim, "dt_fs", None)
+    dy_A        = float(getattr(sim, "dy_A", 1.0))
+    nt          = int(getattr(sim, "nt", sim.psi.shape[1]))
+    yL, yR      = getattr(sim, "yL", None), getattr(sim, "yR", None)
+
+    # E (solo valor en eV, con LaTeX)
+    line1_parts = []
+    if energies_eV is not None and 0 <= E < len(energies_eV):
+        line1_parts.append(rf"$E \approx {float(energies_eV[E]):.3f}\ \mathrm{{eV}}$")
+
+    # tiempo (fs o índice)
+    if dt_fs is not None:
+        line1_parts.append(rf"$t = {t_idx*float(dt_fs):.2f}\ \mathrm{{fs}}$")
+    else:
+        line1_parts.append(rf"$t_\mathrm{{idx}} = {t_idx}$")
+    line1 = " \u2014 ".join(line1_parts)  # em dash entre E y t
+
+    # Lb, L, T
+    L_total_A = sim.ny * dy_A if hasattr(sim, "ny") else None
+    T_total_fs = float(dt_fs)*(nt-1) if dt_fs is not None else None
+
+    # Lb desde meta o de yR-yL
+    Lb_A = None
+    if hasattr(sim, "meta") and isinstance(sim.meta, dict):
+        for k in ("Lb_A", "Lb_Å", "Lb_angstrom"):
+            if k in sim.meta:
+                try: Lb_A = float(sim.meta[k]); break
+                except Exception: pass
+    if Lb_A is None and (yL is not None and yR is not None):
+        Lb_A = float(max(0, int(yR) - int(yL))) * dy_A
+
+    line2_parts = []
+    if Lb_A is not None:   line2_parts.append(rf"$L_b = {Lb_A:.1f}\ \AA$")
+    if L_total_A is not None: line2_parts.append(rf"$L = {L_total_A:.0f}\ \AA$")
+    if T_total_fs is not None: line2_parts.append(rf"$T = {T_total_fs:.1f}\ \mathrm{{fs}}$")
+    line2 = " \u2014 ".join(line2_parts)
+
+    # gamma_1,2,3 y beta_eff
+    def _get_meta(key):
+        if hasattr(sim, key): return getattr(sim, key)
+        if hasattr(sim, "meta") and isinstance(sim.meta, dict): return sim.meta.get(key, None)
+        return None
+
+    gamma1 = _get_meta("gamma1")
+    gamma2 = _get_meta("gamma2")
+    gamma3 = _get_meta("gamma3")
+
+    beta_eff = _get_meta("beta_eff_eVA") or _get_meta("beta_eff") or _get_meta("beta_eVA")
+
+    line3_parts = []
+    if gamma1 is not None and gamma2 is not None and gamma3 is not None:
+        line3_parts.append(rf"$\gamma_1={float(gamma1):.3f},\ \gamma_2={float(gamma2):.3f},\ \gamma_3={float(gamma3):.3f}$")
+
+    if beta_eff is not None:
+        line3_parts.append(rf"$\beta_\mathrm{{eff}}={float(beta_eff):.3f}\ \mathrm{{eV}}\cdot\AA$")
+
+    line3 = " \u2014 ".join(line3_parts)
+
+
+    title_lines = [l for l in (line1, line2, line3) if l]
+    if title_lines:
+        ax.set_title("\n".join(title_lines))
+
+    # ---- Save
     outdir.mkdir(parents=True, exist_ok=True)
     outfile = outdir / f"snapshot_E{E}_t{t_idx}_{layout}.png"
     fig.savefig(outfile, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
     return outfile
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -175,7 +234,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--energy-index", type=int, default=None, help="Energy index to visualize (default: middle).")
     p.add_argument("--layout", choices=["shared", "split"], default="shared",
                    help="shared: HH/LH on same y-axis; split: HH positive, LH negative (mirror).")
-    p.add_argument("--style", default="default", help="Matplotlib style (e.g., 'seaborn-v0_8-paper').")
+    p.add_argument("--style", default="seaborn-v0_8-paper", help="Matplotlib style (e.g., 'seaborn-v0_8-paper').")
     p.add_argument("--no-mmap", action="store_true", help="Disable numpy memmap when loading psi.npy.")
     # Snapshots
     p.add_argument("--snap", type=int, action="append", default=[],
@@ -245,7 +304,7 @@ def main():
     # Slider (integer ticks over [0, nt-1])
     s_time = Slider(
         ax=ax_slider,
-        label="time index",
+        label="time",
         valmin=0,
         valmax=sim.nt - 1,
         valinit=0,
@@ -274,7 +333,6 @@ def main():
 
     fig.canvas.mpl_connect("key_press_event", _on_key)
 
-    plt.tight_layout()
     plt.show()
 
 
