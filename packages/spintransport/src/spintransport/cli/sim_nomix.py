@@ -390,6 +390,16 @@ def run_simulation(cfg: SimConfig) -> None:
 
     H = H_KL + H_R + H_V
 
+    # Complex Absorption Potential (CAP)
+    cap_A_default   = 0.1 * cfg.L_A                           # 10% del dominio por lado
+    cap_eta_default = 0.5 * max(cfg.E_max_eV, cfg.Vb_eV)        # escala razonable
+    H += st.cap_potential_matrix(
+        ny, dy_A=cfg.dy_A,
+        Lcap_A=cap_A_default,
+        eta_eV=cap_eta_default,
+        order=3, where="both"
+    )
+
     # --- Crank–Nicolson operators ---
     _, R, LU = st.build_crank_nicolson_system(H, dt)
 
