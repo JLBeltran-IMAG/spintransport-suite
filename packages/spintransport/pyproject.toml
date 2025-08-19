@@ -33,6 +33,7 @@ where = ["src"]
 
 [project.scripts]
 spintransport-sim              = "spintransport.cli.sim:main"
+spintransport-sim-nomix              = "spintransport.cli.sim_nomix:main"
 spintransport-time-evolution   = "spintransport.viz.time_evolution:main"
 spintransport-export-mp4       = "spintransport.viz.export_mp4:main"
 spintransport-export-gif       = "spintransport.viz.export_gif:main"

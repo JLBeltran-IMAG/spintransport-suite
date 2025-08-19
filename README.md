@@ -28,7 +28,7 @@ pip install --force-reinstall --no-deps packages/spintransport/dist/*.whl
 # 1) run a simulation (example values!)
 spintransport-sim \
   --L_A 1200 --T_fs 108.9 --dy_A 1.0 --dt_fs 0.968 \
-  --Emin_eV 0.0 --Emax_eV 1.5 --nE 101 \
+  --E_min 0.0 --E_max 1.5 --nE 101 \
   --gamma1 6.790 --gamma2 1.900 --gamma3 2.681 \
   --Lb_A 20 --Vb_eV 0.3 --beta_eff_eVA 0.4 \
   --out rashba_out
@@ -89,7 +89,7 @@ Run the simulator and write results.
 ```bash
 spintransport-sim \
   --L_A <Å> --T_fs <fs> --dy_A <Å> --dt_fs <fs> \
-  --Emin_eV <eV> --Emax_eV <eV> --nE <int> \
+  --E_min <eV> --E_max <eV> --nE <int> \
   --gamma1 <float> --gamma2 <float> --gamma3 <float> \
   --Lb_A <Å> --Vb_eV <eV> --beta_eff_eVA <eV·Å> \
   --out <folder>
@@ -250,7 +250,7 @@ spintransport/
 # Mínimo razonable (ejemplo):
 spintransport-sim \
   --L_A 1200 --T_fs 108.9 --dy_A 1.0 --dt_fs 0.968 \
-  --Emin_eV 0.0 --Emax_eV 1.5 --nE 101 \
+  --E_min 0.0 --E_max 1.5 --nE 101 \
   --gamma1 6.790 --gamma2 1.900 --gamma3 2.681 \
   --Lb_A 20 --Vb_eV 0.3 --beta_eff_eVA 0.4 \
   --out rashba_out

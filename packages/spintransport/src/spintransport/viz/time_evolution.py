@@ -328,6 +328,24 @@ def main():
         valstep=1,
     )
 
+    # Drawing the position of Barrier potential value on the energy slider
+    # --------------------------------------------------------------------
+    Vb: float | None = None
+    if isinstance(sim.meta, dict):
+        vb_val = sim.meta.get("Vb_eV")
+        if vb_val is not None:
+            try:
+                Vb = float(vb_val)
+            except (TypeError, ValueError):
+                Vb = None
+
+    if (Vb is not None) and (sim.energies_eV is not None) and (sim.nE > 0):
+        e = np.asarray(sim.energies_eV, dtype=float)
+        idx_vb = int(np.argmin(np.abs(e - Vb)))
+        idx_vb = max(0, min(sim.nE - 1, idx_vb))
+        ax_energy.axvline(idx_vb, color="green", lw=1.6, zorder=5)
+    # --------------------------------------------------------------------
+
     def _update_all(_=None):
         t_idx = int(s_time.val)
         E_idx = int(s_energy.val)

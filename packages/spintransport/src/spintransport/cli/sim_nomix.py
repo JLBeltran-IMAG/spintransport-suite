@@ -1,14 +1,24 @@
+
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Jorge Luis Beltran Diaz and Leovildo Diago Cisneros
 #
-# Module: spintransport.cli.sim
-# Brief : CLI to run the Kohn–Luttinger + Rashba time-domain simulator and save outputs.
+# Module: spintransport.cli.sim_nomix
+# Brief : Time-domain simulation with diagonal Kohn–Luttinger (no HH–LH mixing)
+#         and *with* effective Rashba coupling active.
 # Project: spintransport-suite
 # Authors: Jorge Luis Beltran Diaz and Leovildo Diago Cisneros
 """
-Simulation CLI: builds the Hamiltonian, evolves 4-component wavepackets, and writes psi/meta/energy axis.
-"""
+Run a time-domain simulation of |psi(y,t;E)|^2 using a **no-mixing** Kohn–Luttinger
+Hamiltonian (4×4 diagonal: HH and LH decoupled in KL), **plus effective Rashba**
+coupling (which can mix HH/LH where the Rashba mask is non-zero, e.g., in the barrier).
 
+Outputs (in --outdir):
+- meta.json    : parameters (dy_A, dt_fs, yL/yR, Lb_A, Vb_eV, gamma1..3, beta_eff_eVA, mode)
+- psi.npy      : complex array (4*ny, nt, nE)
+- E_eV.npy     : energy axis (nE,)
+- T.npy, R.npy : per-component transmission/reflection (4, nE)
+- Ttot.npy, Rtot.npy : totals
+"""
 
 from __future__ import annotations
 
@@ -19,7 +29,6 @@ import json
 import numpy as np
 
 from spintransport.physics import st
-
 
 
 # =================
@@ -100,63 +109,29 @@ def symmetrize(A: np.ndarray, D: np.ndarray) -> np.ndarray:
 # =========================
 # Hamiltonian components
 # =========================
-def kohn_luttinger_hamiltonian(ny: int, dy_au: float, gamma1: float, gamma2: float, gamma3: float,
-                               kz_expect: float = 1.0) -> np.ndarray:
+def kohn_luttinger_hamiltonian(
+    ny: int,
+    dy_au: float,
+    gamma1: float,
+    gamma2: float,
+    gamma3: float,
+    kz_expect: float = 1.0
+) -> np.ndarray:
     """
-    Reduced 4x4 Kohn-Luttinger Hamiltonian in the basis [hh↑, lh↑, lh↓, hh↓],
-    discretized on a 1D grid along y with operators KY, KY2.
-
-    Blocks pattern (schematic):
-      H11 ~ (ħ² γ_+)/2 * k_y²,   H22 ~ (ħ² γ_-)/2 * k_y²
-      H12 ~ (ħ² √3 γ_3 ⟨kz⟩)/2 * k_y
-      H13 ~ (ħ² √3 γ_2)/2 * k_y²
-      Remaining entries by symmetry/pattern for 4x4 structure.
-
-    Parameters
-    ----------
-    ny, dy_au : grid size and spacing (atomic units).
-    gamma1, gamma2, gamma3 : Luttinger parameters.
-    kz_expect : float
-        Expectation of k_z (dimension of inverse length, in the same au system).
-        For symmetric ground subband, it is ~0.
-
-    Returns
-    -------
-    np.ndarray
-        (4*ny, 4*ny) complex Hermitian matrix.
+    Diagonal (no-mixing) 4x4 KL Hamiltonian in basis [HH↑, LH↑, LH↓, HH↓].
     """
-    gamma_p = gamma1 + gamma2
-    gamma_m = gamma1 - gamma2
-
-    ky = KY(ny, dy_au)
+    gamma_p = float(gamma1 + gamma2)
+    gamma_m = float(gamma1 - gamma2)
     ky2 = KY2(ny, dy_au)
 
-    H11 = (HBAR ** 2) * 0.5 * gamma_p * ky2
-    H22 = (HBAR ** 2) * 0.5 * gamma_m * ky2
-    H13 = (HBAR ** 2) * 0.5 * np.sqrt(3.0) * gamma2 * ky2
-    H12 = (HBAR ** 2) * 0.5 * np.sqrt(3.0) * gamma3 * kz_expect * ky
-
     H = np.zeros((4 * ny, 4 * ny), dtype=complex)
+    H11 = (HBAR**2) * 0.5 * gamma_p * ky2
+    H22 = (HBAR**2) * 0.5 * gamma_m * ky2
 
-    # Diagonal blocks
     H[0 * ny:1 * ny, 0 * ny:1 * ny] = H11
     H[1 * ny:2 * ny, 1 * ny:2 * ny] = H22
     H[2 * ny:3 * ny, 2 * ny:3 * ny] = H22
     H[3 * ny:4 * ny, 3 * ny:4 * ny] = H11
-
-    # Off-diagonal pattern
-    H[0 * ny:1 * ny, 1 * ny:2 * ny] = H12
-    H[1 * ny:2 * ny, 0 * ny:1 * ny] = H12
-
-    H[0 * ny:1 * ny, 2 * ny:3 * ny] = H13
-    H[2 * ny:3 * ny, 0 * ny:1 * ny] = H13
-
-    H[1 * ny:2 * ny, 3 * ny:4 * ny] = H13
-    H[3 * ny:4 * ny, 1 * ny:2 * ny] = H13
-
-    H[2 * ny:3 * ny, 3 * ny:4 * ny] = -H12
-    H[3 * ny:4 * ny, 2 * ny:3 * ny] = -H12
-
     return H
 
 
@@ -166,7 +141,7 @@ def rashba_hamiltonian(ny: int, dy_au: float, beta_eff_eVA: float, mask1d: np.nd
 
     Implementation detail:
     - Use a y-dependent coefficient β_eff (in au) via diagonal Beta,
-      and Hermitian symmetrization with k_y: K = ½ (Beta k_y + k_y Beta).
+      and Hermitian symmetrization with k_y: K = 1/2 (Beta k_y + k_y Beta).
     """
     ky = KY(ny, dy_au)
     Beta = np.diag(alpha_eVA_to_au(beta_eff_eVA) * mask1d.astype(float))  # Ha·Bohr
@@ -414,16 +389,6 @@ def run_simulation(cfg: SimConfig) -> None:
     H_R = rashba_hamiltonian(ny, dy, cfg.beta_eff_eVA, mask_b)
 
     H = H_KL + H_R + H_V
-
-    # Complex Absorption Potential (CAP)
-    cap_A_default   = 0.1 * cfg.L_A                           # 10% del dominio por lado
-    cap_eta_default = 0.5 * max(cfg.E_max_eV, cfg.Vb_eV)        # escala razonable
-    H += st.cap_potential_matrix(
-        ny, dy_A=cfg.dy_A,
-        Lcap_A=cap_A_default,
-        eta_eV=cap_eta_default,
-        order=3, where="both"
-    )
 
     # --- Crank–Nicolson operators ---
     _, R, LU = st.build_crank_nicolson_system(H, dt)

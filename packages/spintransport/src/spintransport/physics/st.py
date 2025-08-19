@@ -57,6 +57,50 @@ def femtosecond(x):  # type: ignore[override]
     return x * FS_TO_AU
 
 
+# ------------------------------------------
+# Complex Absorbing Potential (CAP) helpers
+# ------------------------------------------
+def _cap_profile(ny: int, Lcap_A: float, dy_A: float, where: str = "both") -> np.ndarray:
+    w = np.zeros(ny, float)
+    ncap = int(max(1, round(Lcap_A / max(dy_A, 1e-30))))
+    if ncap <= 0:
+        return w
+    if where in ("left", "both"):
+        w[:ncap] = np.linspace(0.0, 1.0, ncap, endpoint=True)
+    if where in ("right", "both"):
+        ramp = np.linspace(0.0, 1.0, ncap, endpoint=True)
+        w[-ncap:] = np.maximum(w[-ncap:], ramp[::-1])
+    return w
+
+def cap_potential_matrix(
+    ny: int,
+    dy_A: float,
+    Lcap_A: float,
+    eta_eV: float = 0.5,
+    order: int = 3,
+    where: str = "both"
+) -> np.ndarray:
+    """
+    H_CAP (4ny×4ny) = -i*diag(W), W(y)= eV(eta_eV)*[w(y)]^order.
+    Se replica en los 4 bloques diagonales.
+    """
+    if Lcap_A <= 0.0 or eta_eV <= 0.0:
+        return np.zeros((4*ny, 4*ny), dtype=complex)
+    w = _cap_profile(ny, Lcap_A, dy_A, where=where)
+    w = w ** max(1, int(order))
+    W_au = eV(float(eta_eV)) * w  # usa tu conversor eV->a.u.
+    D = -1j * np.diag(W_au.astype(complex))
+    Hcap = np.zeros((4*ny, 4*ny), dtype=complex)
+    for b in range(4):
+        Hcap[b*ny:(b+1)*ny, b*ny:(b+1)*ny] = D
+    return Hcap
+
+
+
+
+
+
+
 # ====================================
 # Finite-difference derivative matrices
 # ====================================
@@ -184,41 +228,30 @@ def evolve_crank_nicolson(lu: tuple[np.ndarray, np.ndarray],
                           psi0: np.ndarray,
                           n_time_steps: int,
                           show_progress: bool = True) -> np.ndarray:
-    """
-    Time-evolve a *matrix* of states with Crank–Nicolson.
-
-    Parameters
-    ----------
-    lu : (np.ndarray, np.ndarray)
-        LU factorization (lu, piv) of the left matrix `L`.
-    right : np.ndarray
-        Precomputed `R` matrix.
-    psi0 : np.ndarray
-        Initial states, shape (N, nE). Each column is one energy injection.
-    n_time_steps : int
-        Number of time steps to compute (including the t=0 slice in the output).
-    show_progress : bool
-        If True, print a simple progress bar.
-
-    Returns
-    -------
-    np.ndarray
-        Array with shape (N, n_time_steps, nE): full time history for all energies.
-    """
     N, nE = psi0.shape
     psi = np.zeros((N, n_time_steps, nE), dtype=complex)
     psi[:, 0, :] = psi0
 
     lu_mat, piv = lu
+
+    # --- Dirichlet BC en extremos ---
+    def _enforce_dirichlet(t_idx: int) -> None:
+        psi[0, t_idx, :] = 0.0
+        psi[-1, t_idx, :] = 0.0
+
     for t in range(1, n_time_steps):
-        rhs = right @ psi[:, t - 1, :]          # (N, nE)
+        rhs = right @ psi[:, t - 1, :]
         psi[:, t, :] = spla.lu_solve((lu_mat, piv), rhs)
 
+        # aplicar Dirichlet
+        _enforce_dirichlet(t)
+
         if show_progress:
-            frac = (t) / (n_time_steps - 1 if n_time_steps > 1 else 1)
+            frac = t / (n_time_steps - 1 if n_time_steps > 1 else 1)
             bar = int(50 * frac)
             print(f"\rTime-stepping: [{'#' * bar}{'-' * (50 - bar)}] {int(100 * frac)}%", end="")
 
     if show_progress:
         print("\nDone.")
     return psi
+
