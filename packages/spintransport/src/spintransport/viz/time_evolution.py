@@ -22,12 +22,12 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Tuple, Iterable, List
+from typing import Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, ScalarFormatter
 
 
 from spintransport.io.simio import read_sim, SimData
@@ -118,7 +118,13 @@ def _save_snapshot(sim: SimData, E: int, t_idx: int, layout: str, style: str, ou
     Render and save a static PNG snapshot at time index t_idx for energy index E.
     """
     plt.style.use(style)
-    fig, ax = plt.subplots(figsize=(6, 4), layout="constrained")
+    fig, ax = plt.subplots(figsize=(4, 3.2), layout="constrained")
+
+    formatter = ScalarFormatter(useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((-3, 3))
+    ax.yaxis.set_major_formatter(formatter)
+    ax.xaxis.set_major_formatter(formatter)
 
     # --- Axis & barrier
     x_A = np.arange(sim.ny) * float(sim.dy_A)
@@ -228,7 +234,6 @@ def _save_snapshot(sim: SimData, E: int, t_idx: int, layout: str, style: str, ou
     fig.savefig(outfile, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
     return outfile
-
 
 
 def build_parser() -> argparse.ArgumentParser:
